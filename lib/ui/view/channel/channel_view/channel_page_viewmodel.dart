@@ -5,20 +5,21 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:zurichat/app/app.locator.dart';
 import 'package:zurichat/app/app.router.dart';
+import 'package:zurichat/utilities/constants/app_strings.dart';
 import 'package:zurichat/models/channel_members.dart';
 import 'package:zurichat/models/channel_model.dart';
 import 'package:zurichat/models/user_post.dart';
-import 'package:zurichat/package/base/server-request/api/zuri_api.dart';
-import 'package:zurichat/package/base/server-request/channels/channels_api_service.dart';
-import 'package:zurichat/services/centrifuge_service.dart';
-import 'package:zurichat/services/local_storage_services.dart';
-import 'package:zurichat/services/media_service.dart';
-import 'package:zurichat/services/notification_service.dart';
+import 'package:zurichat/utilities/api_handlers/zuri_api.dart';
+import 'package:zurichat/services/messaging_services/channels_api_service.dart';
+import 'package:zurichat/services/messaging_services/centrifuge_rtc_service.dart';
+import 'package:zurichat/services/app_services/local_storage_services.dart';
+import 'package:zurichat/services/app_services/media_service.dart';
+import 'package:zurichat/services/app_services/notification_service.dart';
 import 'package:zurichat/app/app.logger.dart';
-import 'package:zurichat/services/user_service.dart';
+import 'package:zurichat/services/in_review/user_service.dart';
 import 'package:zurichat/ui/shared/shared.dart';
 import 'package:zurichat/utilities/enums.dart';
-import 'package:zurichat/utilities/storage_keys.dart';
+import 'package:zurichat/utilities/constants/storage_keys.dart';
 import 'package:simple_moment/simple_moment.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
@@ -40,18 +41,17 @@ class ChannelPageViewModel extends FormViewModel {
   get checkUser => _checkUser;
   final _api = ZuriApi(channelsBaseUrl);
   String pluginId = '6165f520375a4616090b8275';
+  final snackbar = locator<SnackbarService>();
 
   //Draft implementations
   var storedDraft = '';
 
   void getDraft(channelId) {
-    var currentOrgId =
-    _storageService.getString(StorageKeys.currentOrgId);
-    var currentUserId =
-    _storageService.getString(StorageKeys.currentUserId);
+    var currentOrgId = _storageService.getString(StorageKeys.currentOrgId);
+    var currentUserId = _storageService.getString(StorageKeys.currentUserId);
 
     List<String>? spList =
-    _storageService.getStringList(StorageKeys.currentUserChannelIdDrafts);
+        _storageService.getStringList(StorageKeys.currentUserChannelIdDrafts);
     if (spList != null) {
       for (String e in spList) {
         if (jsonDecode(e)['channelId'] == channelId &&
@@ -68,10 +68,8 @@ class ChannelPageViewModel extends FormViewModel {
   }
 
   void storeDraft(channelId, value, channelName, membersCount, public) {
-    var currentOrgId =
-    _storageService.getString(StorageKeys.currentOrgId);
-    var currentUserId =
-    _storageService.getString(StorageKeys.currentUserId);
+    var currentOrgId = _storageService.getString(StorageKeys.currentOrgId);
+    var currentUserId = _storageService.getString(StorageKeys.currentUserId);
 
     var keyMap = {
       'draft': value,
@@ -85,7 +83,7 @@ class ChannelPageViewModel extends FormViewModel {
     };
 
     List<String>? spList =
-    _storageService.getStringList(StorageKeys.currentUserChannelIdDrafts);
+        _storageService.getStringList(StorageKeys.currentUserChannelIdDrafts);
 
     if (value.length > 0 && spList != null) {
       spList.add(json.encode(keyMap));
@@ -162,11 +160,14 @@ class ChannelPageViewModel extends FormViewModel {
 
   void initialise(String channelId) async {
     channelID = channelId;
-    //TODO
-    // await joinChannel(channelId);
+
+    //TODO: join channel wasn't done
+    await joinChannel(channelId);
+
     fetchMessages(channelId);
     getChannelSocketId(channelId);
-    fetchChannelMembers(channelId);
+    //TODO: this was returning the error
+    //fetchChannelMembers(channelId);
     listenToNewMessage(channelId);
     getChannelCreator(channelId);
   }
@@ -243,6 +244,34 @@ class ChannelPageViewModel extends FormViewModel {
     }
   }
 
+  Future<void> deleteChannel(ChannelModel channel) async {
+    try {
+      bool res = await _channelsApiService.deleteChannel(
+          _userService.currentOrgId, channel.id);
+      if (res) {
+        snackbar.showCustomSnackBar(
+          duration: const Duration(seconds: 3),
+          variant: SnackbarType.success,
+          message: 'Channels ${channel.name} deleted successful',
+        );
+
+        _navigationService.back();
+      } else {
+        snackbar.showCustomSnackBar(
+          duration: const Duration(seconds: 3),
+          variant: SnackbarType.failure,
+          message: DeleteOrgError,
+        );
+      }
+    } catch (e) {
+      snackbar.showCustomSnackBar(
+        duration: const Duration(seconds: 3),
+        variant: SnackbarType.failure,
+        message: e.toString(),
+      );
+    }
+  }
+
   void fetchMessages(String channelId) async {
     List? channelMessages =
         await _channelsApiService.getChannelMessages(channelId);
@@ -257,7 +286,8 @@ class ChannelPageViewModel extends FormViewModel {
       channelUserMessages?.add(
         UserPost(
           id: data['_id'],
-          displayName: userid,
+          displayName:
+              _userService.userId == userid ? _userService.userEmail : userid,
           statusIcon: '⭐',
           moment: Moment.now().from(DateTime.parse(data['timestamp'])),
           message: messageEventCheck(data),
@@ -284,6 +314,18 @@ class ChannelPageViewModel extends FormViewModel {
     notifyListeners();
   }
 
+  void deleteMessage(String channelId, String messageId) async {
+    String? userId = storage.getString(StorageKeys.currentUserId);
+    String? orgId = storage.getString(StorageKeys.currentOrgId);
+    await _channelsApiService.deleteChannelMessage(
+        orgId!, channelId, messageId, userId!);
+
+    fetchMessages(channelId);
+    scrollController.jumpTo(scrollController.position.minScrollExtent);
+    _navigationService.back();
+    notifyListeners();
+  }
+
   void sendMessage(String message, [List<File>? media]) async {
     try {
       String? userId = storage.getString(StorageKeys.currentUserId);
@@ -299,7 +341,7 @@ class ChannelPageViewModel extends FormViewModel {
           channelID, "$userId", message, urls);
 
       scrollController.jumpTo(scrollController.position.minScrollExtent);
-
+      fetchChannelMembers(channelID);
       notifyListeners();
     } catch (e) {
       _snackbarService.showCustomSnackBar(
