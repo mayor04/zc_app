@@ -3,19 +3,19 @@ import 'package:stacked_services/stacked_services.dart';
 import 'package:zurichat/models/channel_members.dart';
 import 'package:zurichat/models/channel_model.dart';
 import 'package:zurichat/models/pinned_message_model.dart';
-import 'package:zurichat/utilities/api_handlers/zuri_api.dart';
+import 'package:zurichat/repository/repository.dart';
 import 'package:zurichat/utilities/enums.dart';
+import 'package:zurichat/utilities/failures.dart';
 
 import '../../app/app.locator.dart';
 import '../../app/app.logger.dart';
 import '../app_services/local_storage_services.dart';
 import '../in_review/user_service.dart';
-import '../../utilities/constants/app_constants.dart';
 import '../../utilities/constants/storage_keys.dart';
 
 class ChannelsApiService {
   final log = getLogger('ChannelsApiService');
-  final _api = ZuriApi(channelsBaseUrl);
+  final _api = ChannelsRepo();
   final storageService = locator<SharedPreferenceLocalStorage>();
   final _userService = locator<UserService>();
   final _snackbarService = locator<SnackbarService>();
@@ -26,7 +26,6 @@ class ChannelsApiService {
   // https://channels.zuri.chat/api/v1/61459d8e62688da5302acdb1/channels/
   //TODo - fix
 
-  onChange() {}
   Future<List> getActiveChannels() async {
     final orgId = _userService.currentOrgId;
     log.w('asc: $orgId');
@@ -34,11 +33,8 @@ class ChannelsApiService {
     var joinedChannels = [];
 
     try {
-      final res = await _api.get(
-        'v1/$orgId/channels/',
-        token: token,
-      );
-      joinedChannels = res?.data ?? [];
+      final res = await _api.fetchChannelsInOrg(orgId);
+      joinedChannels = res;
       log.i(joinedChannels);
     } on Exception catch (e) {
       log.e(e.toString());
@@ -54,11 +50,8 @@ class ChannelsApiService {
     var socketName = '';
 
     try {
-      final res = await _api.get(
-        'v1/$orgId/channels/$channelId/socket/',
-        token: token,
-      );
-      socketName = res?.data['socket_name'] ?? '';
+      final res = await _api.getChannelSocketId(channelId, orgId);
+      socketName = res ?? '';
       log.i(socketName);
     } on Exception catch (e) {
       log.e(e.toString());
@@ -73,34 +66,27 @@ class ChannelsApiService {
     final userId = _userService.userId;
     final orgId = _userService.currentOrgId;
 
-    // var channelMessages;
-
     try {
-      final res = await _api
-          .post('v1/$orgId/channels/$channelId/members/', token: token, body: {
-        '_id': userId,
-        'is_admin': true,
-      });
+      final res = await _api.joinChannel(channelId, userId, orgId);
       await storageService.setString(StorageKeys.currentChannelId, channelId);
-      log.i(res?.data);
-      //  channelMessages = res?.data["data"] ?? [];
+      log.i(res);
 
       //  log.i(channelMessages);
-      return res?.data ?? {};
-    } on Exception catch (e) {
+      return res;
+    } catch (e) {
       log.e(e.toString());
       return {};
     }
   }
 
-  getChanelCreator(String channelId) async {
+  Future<String> getChanelCreator(String channelId) async {
     final orgId = _userService.currentOrgId;
     try {
-      final res =
-          await _api.get('v1/$orgId/channels/$channelId/', token: token);
-      return res.data;
-    } on Exception catch (e) {
+      final res = await _api.fetchChannelDetails(orgId, channelId);
+      return res['owner'];
+    } catch (e) {
       log.e(e.toString());
+      return e.toString();
     }
   }
 
@@ -109,14 +95,10 @@ class ChannelsApiService {
     final orgId = _userService.currentOrgId;
 
     try {
-      final res = await _api
-          .post('v1/$orgId/channels/$channelId/members/', token: token, body: {
-        '_id': memberId,
-        'is_admin': false,
-      });
+      final res = await _api.addMemberToChannel(channelId, orgId, memberId);
       await storageService.setString(StorageKeys.currentChannelId, channelId);
-      log.i(res?.data);
-      return res?.data ?? {};
+      log.i(res);
+      return res ?? {};
     } on Exception catch (e) {
       log.e(e.toString());
       return {};
@@ -129,18 +111,13 @@ class ChannelsApiService {
     List channelMessages;
 
     try {
-      final res = await _api.get(
-        'v1/$orgId/channels/$channelId/messages/',
-        token: token,
-      );
-      channelMessages = res?.data ?? [];
-
+      final res = await _api.getChannelMessages(channelId, orgId);
+      channelMessages = res ?? [];
       log.i(channelMessages);
     } on Exception catch (e) {
       log.e(e.toString());
       return [];
     }
-
     return channelMessages;
   }
 
@@ -149,15 +126,8 @@ class ChannelsApiService {
     List<PinnedMessage> pinnedMessages;
 
     try {
-      final res = await _api.post(
-          'v1/$orgId/channels/$channelId/search_messages/',
-          body: {"pinned": true},
-          token: token);
-
-      pinnedMessages = [
-        ...res.data["result"].map((json) => PinnedMessage.fromJson(json))
-      ];
-
+      final res = await _api.getChannelPinnedMessages(orgId, channelId);
+      pinnedMessages = res;
       log.i(pinnedMessages);
     } on Exception catch (e) {
       log.e(e.toString());
@@ -173,12 +143,10 @@ class ChannelsApiService {
     bool successful;
 
     try {
-      final res = await _api.put(
-          'v1/$orgId/messages/$messageId/?user_id=$userId&channel_id=$channelId',
-          body: {"pinned": pinned},
-          token: token);
+      final res = await _api.changeChannelMessagePinnedState(
+          orgId, channelId, messageId, userId, pinned);
 
-      successful = res.data["pinned"] == pinned;
+      successful = res;
 
       log.i(successful);
     } on Exception catch (e) {
@@ -197,11 +165,9 @@ class ChannelsApiService {
     dynamic channelMessage;
 
     try {
-      final res = await _api.post('v1/$orgId/channels/$channelId/messages/',
-          token: token,
-          body: {'user_id': userId, 'content': message, "files": media});
-
-      channelMessage = res?.data['data'] ?? {};
+      final res = await _api.sendChannelMessages(
+          channelId, userId, orgId, message, media);
+      channelMessage = res ?? {};
 
       log.i(channelMessage);
     } on Exception catch (e) {
@@ -210,24 +176,6 @@ class ChannelsApiService {
     }
 
     return channelMessage;
-  }
-
-  Future<List<ChannelModel>> fetchChannel() async {
-    var channels = <ChannelModel>[];
-    try {
-      final res = await _api.get(
-        '/v1/61459d8e62688da5302acdb1/channels/',
-        //token: token,
-      );
-      channels =
-          (res?.data as List).map((e) => ChannelModel.fromJson(e)).toList();
-    } on Exception catch (e) {
-      log.e('Channels EXception $e');
-    } catch (e) {
-      log.e(e);
-    }
-
-    return channels;
   }
 
   Future<bool> createChannels({
@@ -241,47 +189,62 @@ class ChannelsApiService {
     final orgId = id ?? _userService.currentOrgId;
 
     try {
-      final res = await _api.post(
-        'v1/$orgId/channels/',
-        body: {
-          'name': name,
-          'owner': owner,
-          'description': description,
-          'private': private,
-        },
-        token: token,
-      );
+      final res = await _api.createChannels(
+          name, owner, email!, orgId, description, private);
 
-      log.i(res?.data.toString());
+      log.i(res.toString());
 
-      if (res?.statusCode == 201 || res?.statusCode == 200) {
+      if (res) {
         controller.sink.add('created channel');
         return true;
       }
-    } on Exception catch (e) {
+    } catch (e) {
       log.e(e.toString());
     }
 
     return false;
   }
 
+  Future<void> addReplyToMessage(String? messageId, String orgId,
+      String channelId, String userId, String? content, files) async {
+    log.i('CHANNEL ID is $channelId');
+    try {
+      final res = await _api.addReplyToMessage(
+          messageId, orgId, channelId, userId, content, files ?? []);
+      controller.sink.add('Reply sent successfully');
+      log.i('RESULT is $res');
+    } on Failure catch (e) {
+      log.w(e.toString());
+      rethrow;
+    } catch (e) {
+      log.w(e.toString());
+      throw UnknownFailure(errorMessage: e.toString());
+    }
+  }
+
+  Future<List> getRepliesToMessages(String orgId, String messageId) async {
+    try {
+      final res = await _api.getRepliesToMessages(orgId, messageId);
+      return res;
+    } on Failure catch (e) {
+      log.w(e.toString());
+      rethrow;
+    } catch (e) {
+      log.w(e.toString());
+      throw UnknownFailure(errorMessage: e.toString());
+    }
+  }
+
   Future deleteChannelMessage(
       String orgId, String channelId, String messageId, String userId) async {
     try {
-      final res = await _api.delete(
-        '/v1/$orgId/messages/$messageId/?user_id=$userId&channel_id=$channelId',
-        token: token,
-      );
-      if (res?.statusCode == 200 || res?.statusCode == 204) {
-        controller.sink.add('Message Deleted');
-        _snackbarService.showCustomSnackBar(
-            duration: const Duration(milliseconds: 1500),
-            variant: SnackbarType.success,
-            message: 'Message deleted successfully');
-        return true;
-      } else {
-        return false;
-      }
+      await _api.deleteChannelMessage(orgId, channelId, messageId, userId);
+      controller.sink.add('Message Deleted');
+      _snackbarService.showCustomSnackBar(
+          duration: const Duration(milliseconds: 1500),
+          variant: SnackbarType.success,
+          message: 'Message deleted successfully');
+      return true;
     } catch (e) {
       log.e(e.toString());
       return false;
@@ -290,31 +253,21 @@ class ChannelsApiService {
 
   Future<bool> deleteChannel(String orgId, String channelId) async {
     try {
-      final res = await _api.delete(
-        '/v1/$orgId/channels/$channelId/',
-        token: token,
-      );
-      // print("RES IS ${res?.statusCode}");
-      if (res?.statusCode == 201 || res?.statusCode == 204) {
-        controller.sink.add('Channel Deleted');
-        return true;
-      }
-      return false;
+      await _api.deleteChannel(orgId, channelId);
+      controller.sink.add('Channel Deleted');
+      return true;
     } catch (e) {
       log.e(e.toString());
       return false;
     }
   }
 
-  getChannelPage(id) async {
+  Future<ChannelModel?> getChannelPage(id) async {
     String orgId = _userService.currentOrgId;
 
     try {
-      final response = await _api.get(
-        '/v1/$orgId/channels/$id/',
-        //token: token,
-      );
-      return ChannelModel.fromJson(response?.data);
+      final response = await _api.fetchChannelDetails(orgId, id);
+      return ChannelModel.fromJson(response);
     } on Exception catch (e) {
       log.e("Channels page Exception $e");
     } catch (e) {
@@ -325,13 +278,8 @@ class ChannelsApiService {
   Future<List<ChannelMembermodel>?> getChannelMembers(id) async {
     String orgId = _userService.currentOrgId;
     try {
-      final res = await _api.get(
-        '/v1/$orgId/channels/$id/members/',
-        //token: token,
-      );
-      return (res?.data as List)
-          .map((e) => ChannelMembermodel.fromJson(e))
-          .toList();
+      final res = await _api.getChannelMembers(id, orgId);
+      return res;
     } on Exception catch (e) {
       log.e("Channels member EXception $e");
     } catch (e) {

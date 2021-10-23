@@ -1,9 +1,8 @@
 import 'package:zurichat/app/app.locator.dart';
 import 'package:zurichat/models/user_search_model.dart';
-import 'package:zurichat/utilities/api_handlers/zuri_api.dart';
+import 'package:zurichat/repository/repository.dart';
 import 'package:zurichat/services/in_review/organization_api_service.dart';
 import 'package:zurichat/services/app_services/local_storage_services.dart';
-import 'package:zurichat/utilities/constants/app_constants.dart';
 import 'package:zurichat/utilities/constants/storage_keys.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
@@ -12,7 +11,7 @@ class ChannelAddPeopleViewModel extends BaseViewModel {
   final organizationApi = OrganizationApiService();
   final storageService = locator<SharedPreferenceLocalStorage>();
   final navigationService = locator<NavigationService>();
-  final api = ZuriApi(channelsBaseUrl);
+  final api = ChannelsRepo();
 
   String? get orgId => storageService.getString(StorageKeys.currentOrgId);
 
@@ -45,7 +44,7 @@ class ChannelAddPeopleViewModel extends BaseViewModel {
     if (markedUsers.isNotEmpty) {
       setBusy(true);
       for (final user in markedUsers) {
-        await api.addMemberToChannel(channelId, orgId!, user.id!, token);
+        await api.addMemberToChannel(channelId, orgId!, user.id!);
       }
       setBusy(false);
       navigateBack();

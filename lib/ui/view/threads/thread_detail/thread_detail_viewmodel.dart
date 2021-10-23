@@ -1,10 +1,9 @@
 import 'dart:convert';
 
+import 'package:zurichat/services/messaging_services/channels_api_service.dart';
 import 'package:zurichat/utilities/constants/app_strings.dart';
-import 'package:zurichat/utilities/api_handlers/zuri_api.dart';
 import 'package:zurichat/services/app_services/local_storage_services.dart';
 import 'package:zurichat/services/in_review/user_service.dart';
-import 'package:zurichat/utilities/constants/app_constants.dart';
 import 'package:zurichat/utilities/constants/storage_keys.dart';
 import 'package:intl/intl.dart';
 import 'package:stacked/stacked.dart';
@@ -12,10 +11,8 @@ import 'package:stacked_services/stacked_services.dart';
 import 'package:zurichat/app/app.logger.dart';
 import '../../../../app/app.locator.dart';
 import '../../../../models/user_post.dart';
-import '../../../../utilities/api_handlers/zuri_api.dart';
 import '../../../../services/app_services/local_storage_services.dart';
 import '../../../../services/in_review/user_service.dart';
-import '../../../../utilities/constants/app_constants.dart';
 import '../../../../utilities/enums.dart';
 
 class ThreadDetailViewModel extends BaseViewModel {
@@ -24,7 +21,7 @@ class ThreadDetailViewModel extends BaseViewModel {
   final log = getLogger("ThreadDetailViewModel");
 
   final _bottomSheetService = locator<BottomSheetService>();
-  final _apiService = ZuriApi(channelsBaseUrl);
+  final _apiService = ChannelsApiService();
   final _userService = locator<UserService>();
   final storageService = locator<SharedPreferenceLocalStorage>();
 
@@ -89,7 +86,7 @@ class ThreadDetailViewModel extends BaseViewModel {
 
   void fetchThreadMessages() async {
     List? threadMessages =
-        await _apiService.getRepliesToMessages(channelMessageId, currentOrg);
+        await _apiService.getRepliesToMessages(currentOrg, channelMessageId);
 
     channelThreadMessages.clear();
     threadMessages.forEach((message) async {
@@ -117,7 +114,7 @@ class ThreadDetailViewModel extends BaseViewModel {
 
   Future<void> sendThreadMessage(String message, String channelId) async {
     await _apiService.addReplyToMessage(
-        channelMessageId, message, null, currentOrg, userId, channelId);
+        channelMessageId, currentOrg, channelId, userId, message, null);
     fetchThreadMessages();
   }
 

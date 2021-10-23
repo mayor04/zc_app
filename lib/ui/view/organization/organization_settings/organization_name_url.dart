@@ -9,7 +9,6 @@ import 'package:zurichat/utilities/constants/colors.dart';
 import 'package:zurichat/ui/shared/text_field.dart';
 import 'package:zurichat/ui/shared/dumb_widgets/zuri_appbar.dart';
 import 'package:zurichat/ui/shared/dumb_widgets/zuri_loader.dart';
-import 'package:stacked_hooks/stacked_hooks.dart';
 
 class OrganizationNameUrl extends HookWidget {
   final OrganizationModel org;

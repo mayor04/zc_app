@@ -39,7 +39,9 @@ class ChannelListViewModel extends BaseViewModel {
         return;
       }
       setBusy(true);
-      _channelsList = await api.fetchChannel();
+      _channelsList = (await api.getActiveChannels())
+          .map((e) => ChannelModel.fromJson(e))
+          .toList();
       setBusy(false);
     } catch (e) {
       snackbar.showCustomSnackBar(

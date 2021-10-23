@@ -5,10 +5,9 @@ import 'package:stacked_services/stacked_services.dart';
 import 'package:zurichat/app/app.locator.dart';
 import 'package:zurichat/app/app.router.dart';
 import 'package:zurichat/models/organization_model.dart';
-import 'package:zurichat/utilities/api_handlers/zuri_api.dart';
+import 'package:zurichat/repository/repository.dart';
 import 'package:zurichat/services/app_services/media_service.dart';
 import 'package:zurichat/services/in_review/user_service.dart';
-import 'package:zurichat/ui/shared/shared.dart';
 import 'package:zurichat/utilities/enums.dart';
 import 'package:zurichat/utilities/mixins/validators_mixin.dart';
 import '../../../../app/app.logger.dart';
@@ -20,7 +19,7 @@ class OrganizationSettingsViewModel extends BaseViewModel with ValidatorMixin {
   final dialog = locator<DialogService>();
   final _mediaService = locator<MediaService>();
   final _userService = locator<UserService>();
-  final _zuriApi = ZuriApi(coreBaseUrl);
+  final _zuriApi = OrganizationRepo();
   late String name, url;
 
   File? tempImage;

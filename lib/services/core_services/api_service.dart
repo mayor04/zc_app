@@ -1,84 +1,135 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
+import 'package:zurichat/utilities/api_handlers/dio_interceptors.dart';
 
-import '../../utilities/constants/app_constants.dart';
 import '../../utilities/failures.dart';
 
 class ApiService {
   final Dio _dio = Dio();
-  void sendGetRequest(endpoint) async {
-    final response = await _dio.get(apiBaseUrl + endpoint);
-    jsonDecode(response.data);
+
+  ApiService() {
+    _dio.options.sendTimeout = 60 * 1000;
+    _dio.options.receiveTimeout = 60 * 1000;
+    _dio.interceptors.add(DioInterceptor());
   }
 
-  Future sendPostRequest(body, endpoint) async {
+  /// This method send a **GET** request and returns a value or an error
+  /// if it was not successful. It must have a `path` specified. `data` and
+  /// `headers` may not be specified.
+  Future<dynamic> get(String path,
+      {Map<String, dynamic>? data, Map<String, String>? headers}) async {
     try {
-      final response = await _dio.post(
-        apiBaseUrl + endpoint,
-        data: json.encode(body),
-      );
-
-      final result = response.data;
-      return result;
+      final response = await _dio.get(path,
+          queryParameters: data, options: Options(headers: headers));
+      return response.data;
     } on DioError catch (e) {
       convertException(e);
     }
   }
 
-  Future sendMultiPartRequest(body, endpoint) async {
+  /// This method send a **POST** request and returns a value or an error
+  /// if it was not successful. It must have a `path` specified. `data` and
+  /// `headers` may not be specified.
+  ///
+  /// `data` can be a _Map_ or a _FormData_
+  Future<dynamic> post(String path,
+      {dynamic body,
+      Map<String, dynamic>? where,
+      Map<String, String>? headers}) async {
     try {
       final response = await _dio.post(
-        apiBaseUrl + endpoint,
+        path,
         data: body,
+        queryParameters: where,
+        options: Options(headers: headers),
       );
 
-      final result = response.data;
-      return result;
+      return response.data;
     } on DioError catch (e) {
       convertException(e);
     }
   }
 
-//!Adjust the patch function as needed
-  Future sendPatchRequest(body, endpoint, userId) async {
+  /// This method send a **PATCH** request and returns a value or an error
+  /// if it was not successful. It must have a `path` specified. `data` and
+  /// `headers` may not be specified.
+  ///
+  /// `data` can be a _Map_ or a _FormData_
+  Future<dynamic> patch(String path,
+      {dynamic body,
+      Map<String, dynamic>? where,
+      Map<String, String>? headers}) async {
     try {
-      final response =
-          await _dio.patch(apiBaseUrl + endpoint, data: json.encode(body));
-      final result = response.data;
-      return result;
+      final response = await _dio.patch(
+        path,
+        data: body,
+        queryParameters: where,
+        options: Options(headers: headers),
+      );
+      return response.data;
     } on DioError catch (e) {
       convertException(e);
     }
   }
 
-  Future getAddPeople(body, endpoint, userId, channelId, orgId) async {
+  /// This method send a **PUT** request and returns a value or an error
+  /// if it was not successful. It must have a `path` specified. `data` and
+  /// `headers` may not be specified.
+  ///
+  /// `data` can be a _Map_ or a _FormData_
+  Future<dynamic> put(String path,
+      {dynamic body,
+      Map<String, dynamic>? where,
+      Map<String, String>? headers}) async {
     try {
-      final response = await _dio.get(apiBaseUrl + endpoint);
-      final result = response.data;
-      return result;
+      final response = await _dio.put(
+        path,
+        data: body,
+        queryParameters: where,
+        options: Options(headers: headers),
+      );
+      return response.data;
     } on DioError catch (e) {
       convertException(e);
     }
   }
 
+  /// This method send a **DELETE** request and returns a value or an error
+  /// if it was not successful. It must have a `path` specified. `data` and
+  /// `headers` may not be specified.
+  ///
+  /// `data` can be a _Map_ or a _FormData_
+  Future<dynamic> delete(String path,
+      {dynamic body,
+      Map<String, dynamic>? where,
+      Map<String, String>? headers}) async {
+    try {
+      final response = await _dio.delete(
+        path,
+        data: body,
+        queryParameters: where,
+        options: Options(headers: headers),
+      );
+      return response.data;
+    } on DioError catch (e) {
+      convertException(e);
+    }
+  }
+
+  /// This method handles all possible errors from from a network call.
   Failure convertException(DioError e) {
-    if (e.type == DioErrorType.cancel) {
-      return InputFailure(errorMessage: e.message);
-    } else if (e.type == DioErrorType.connectTimeout) {
-      return NetworkFailure();
-    } else if (e.type == DioErrorType.receiveTimeout) {
-      return NetworkFailure();
-    } else if (e.type == DioErrorType.sendTimeout) {
-      return NetworkFailure();
-    } else {
-      if (e.type == DioErrorType.response) {
-        return ServerFailure(error: e.message);
-      } else if (e.type == DioErrorType.other) {
-        return UnknownFailure();
-      } else {
-        return UnknownFailure();
-      }
+    switch (e.type) {
+      case DioErrorType.connectTimeout:
+        throw NetworkFailure();
+      case DioErrorType.sendTimeout:
+        throw NetworkFailure();
+      case DioErrorType.receiveTimeout:
+        throw NetworkFailure();
+      case DioErrorType.response:
+        throw ServerFailure(error: e.message);
+      case DioErrorType.cancel:
+        throw InputFailure(errorMessage: e.message);
+      case DioErrorType.other:
+        throw UnknownFailure();
     }
   }
 }

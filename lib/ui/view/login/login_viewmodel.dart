@@ -1,9 +1,8 @@
 import 'package:zurichat/app/app.logger.dart';
+import 'package:zurichat/repository/repository.dart';
 import 'package:zurichat/utilities/constants/app_strings.dart';
 import 'package:zurichat/models/user_model.dart';
-import 'package:zurichat/utilities/api_handlers/zuri_api.dart';
 import 'package:zurichat/services/in_review/user_service.dart';
-import 'package:zurichat/utilities/constants/app_constants.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
@@ -22,7 +21,7 @@ class LoginViewModel extends FormViewModel {
   final _connectivityService = locator<ConnectivityService>();
   final storageService = locator<SharedPreferenceLocalStorage>();
   final _userService = locator<UserService>();
-  final zuriApi = ZuriApi(coreBaseUrl);
+  final zuriApi = AuthenticationRepo();
   late UserModel userModel;
 
   final log = getLogger('LogInViewModel');

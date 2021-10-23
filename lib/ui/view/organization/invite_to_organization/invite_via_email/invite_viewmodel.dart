@@ -3,10 +3,9 @@ import 'package:dio/dio.dart';
 import 'package:stacked/stacked.dart';
 import 'package:zurichat/app/app.locator.dart';
 import 'package:zurichat/app/app.router.dart';
-import 'package:zurichat/utilities/api_handlers/zuri_api.dart';
+import 'package:zurichat/repository/repository.dart';
 import 'package:zurichat/services/app_services/local_storage_services.dart';
 import 'package:zurichat/services/in_review/user_service.dart';
-import 'package:zurichat/utilities/constants/app_constants.dart';
 import 'package:zurichat/utilities/mixins/validators_mixin.dart';
 import 'package:zurichat/utilities/constants/storage_keys.dart';
 
@@ -19,7 +18,7 @@ class InviteViewModel extends FormViewModel with ValidatorMixin {
   final navigationService = locator<NavigationService>();
   final snackbar = locator<SnackbarService>();
   final log = getLogger('InviteEmailView');
-  final _zuriApi = ZuriApi(coreBaseUrl);
+  final _zuriApi = OrganizationRepo();
 
   Future<void> inviteWithMail(String email) async {
     final orgId = userService.currentOrgId;
@@ -28,16 +27,9 @@ class InviteViewModel extends FormViewModel with ValidatorMixin {
     if (validateEmail(email) == null) {
       setBusy(true);
 
-      Map<String, dynamic> body = {
-        "emails": [email],
-      };
+      List body = [email];
       try {
-        final res = await _zuriApi.inviteToOrganizationWithNormalMail(
-          orgId,
-          body,
-          token,
-        );
-        log.i('>>>>>>>>> invite response : $res');
+        await _zuriApi.inviteToOrganizationWithNormalMail(orgId, body, token);
         setBusy(false);
 
         await storage.setString(StorageKeys.invitedEmail, email);
