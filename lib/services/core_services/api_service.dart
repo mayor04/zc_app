@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:zurichat/utilities/api_handlers/api_utils.dart';
 import 'package:zurichat/utilities/api_handlers/dio_interceptors.dart';
 
 import '../../utilities/failures.dart';
@@ -6,9 +7,10 @@ import '../../utilities/failures.dart';
 class ApiService {
   final Dio _dio = Dio();
 
-  ApiService() {
+  ApiService(baseUrl) {
     _dio.options.sendTimeout = 60 * 1000;
     _dio.options.receiveTimeout = 60 * 1000;
+    _dio.options.baseUrl = baseUrl;
     _dio.interceptors.add(DioInterceptor());
   }
 
@@ -20,7 +22,7 @@ class ApiService {
     try {
       final response = await _dio.get(path,
           queryParameters: data, options: Options(headers: headers));
-      return response.data;
+      return ApiUtils.toApiResponse(response);
     } on DioError catch (e) {
       convertException(e);
     }
@@ -43,7 +45,7 @@ class ApiService {
         options: Options(headers: headers),
       );
 
-      return response.data;
+      return ApiUtils.toApiResponse(response);
     } on DioError catch (e) {
       convertException(e);
     }
@@ -65,7 +67,7 @@ class ApiService {
         queryParameters: where,
         options: Options(headers: headers),
       );
-      return response.data;
+      return ApiUtils.toApiResponse(response);
     } on DioError catch (e) {
       convertException(e);
     }
@@ -87,7 +89,7 @@ class ApiService {
         queryParameters: where,
         options: Options(headers: headers),
       );
-      return response.data;
+      return ApiUtils.toApiResponse(response);
     } on DioError catch (e) {
       convertException(e);
     }
@@ -109,7 +111,7 @@ class ApiService {
         queryParameters: where,
         options: Options(headers: headers),
       );
-      return response.data;
+      return ApiUtils.toApiResponse(response);
     } on DioError catch (e) {
       convertException(e);
     }

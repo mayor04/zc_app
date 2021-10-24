@@ -13,7 +13,7 @@ import 'package:zurichat/utilities/failures.dart';
 import 'i_channels_repo.dart';
 
 class ChannelsRepo extends IChannelsRepo {
-  final ApiService _service = ApiService();
+  final ApiService _service = ApiService(channelsBaseUrl);
   final _log = getLogger('ChannelsRepo');
   final _storageService = locator<SharedPreferenceLocalStorage>();
 
@@ -387,6 +387,8 @@ class ChannelsRepo extends IChannelsRepo {
       throw UnknownFailure(errorMessage: e.toString());
     }
   }
+
+  Map get headers => {'Authorization': 'Bearer $token'};
 
   String? get token =>
       _storageService.getString(StorageKeys.currentSessionToken);

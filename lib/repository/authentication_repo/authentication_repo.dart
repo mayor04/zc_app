@@ -4,13 +4,13 @@ import 'package:zurichat/utilities/constants/app_constants.dart';
 import 'i_authentication_repo.dart';
 
 class AuthenticationRepo extends IAuthenticationRepo {
-  final ApiService _service = ApiService();
+  final ApiService _service = ApiService(coreBaseUrl);
 
   @override
   Future<dynamic> login(
       {required String email, required String password, token}) async {
     final headers = {'Authorization': 'Bearer $token'};
-    return await _service.post("${coreBaseUrl}auth/login",
+    return await _service.post("auth/login",
         body: {
           "email": email,
           "password": password,
@@ -28,7 +28,7 @@ class AuthenticationRepo extends IAuthenticationRepo {
       required String phoneNumber,
       required String token}) async {
     return await _service.post(
-      "$coreBaseUrl/users",
+      "/users",
       body: {
         'first_name': firstName,
         'last_name': lastName,

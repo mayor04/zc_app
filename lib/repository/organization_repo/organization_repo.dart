@@ -2,33 +2,32 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:zurichat/app/app.locator.dart';
 import 'package:zurichat/models/organization_model.dart';
 import 'package:zurichat/models/user_search_model.dart';
+import 'package:zurichat/services/app_services/local_storage_services.dart';
 import 'package:zurichat/services/core_services/api_service.dart';
 import 'package:zurichat/utilities/constants/app_constants.dart';
 import 'package:zurichat/app/app.logger.dart';
+import 'package:zurichat/utilities/constants/storage_keys.dart';
 import 'package:zurichat/utilities/failures.dart';
 
+import '../repo_mixin.dart';
 import 'i_organization_repo.dart';
 
-class OrganizationRepo extends IOrganizationRepo {
-  final ApiService _service = ApiService();
+class OrganizationRepo extends IOrganizationRepo with RepoMixin {
+  final ApiService _api = ApiService(coreBaseUrl);
   final log = getLogger('OrganizationRepo');
 
   /// Fetches a list of organizations that exist in the Zuri database
   /// This does not fetch the Organization the user belongs to
   /// To implement that use `getJoinedOrganizations()`
   @override
-  Future<List<OrganizationModel>> fetchListOfOrganizations(token) async {
+  Future<List> fetchListOfOrganizations() async {
     try {
-      final res = await _service.get(
-        '$apiBaseUrl/organizations',
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final res = await _api.get('/organizations', headers: headers);
       log.i(res);
-      return (res?['data'] as List)
-          .map((e) => OrganizationModel.fromJson(e))
-          .toList();
+      return res?.data?['data'];
     } on Failure catch (e) {
       log.w(e.toString());
       rethrow;
@@ -40,17 +39,12 @@ class OrganizationRepo extends IOrganizationRepo {
 
   ///Get the list of Organization the user has joined
   @override
-  Future<List<OrganizationModel>> getJoinedOrganizations(
-      token, String email) async {
+  Future<List> getJoinedOrganizations(String email) async {
     try {
-      final res = await _service.get(
-        '$channelsBaseUrl/users/$email/organizations',
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final res =
+          await _api.get('/users/$email/organizations', headers: headers);
       log.i("RESPONSE !!$res");
-      return (res?['data'] as List)
-          .map((e) => OrganizationModel.fromJson(e))
-          .toList();
+      return res?.data?['data'];
     } on Failure catch (e) {
       log.w(e.toString());
       rethrow;
@@ -63,14 +57,11 @@ class OrganizationRepo extends IOrganizationRepo {
   /// Fetches information on a particular Organization. It takes a parameter
   /// `id` which is the id of the organization
   @override
-  Future fetchOrganizationInfo(String id, token) async {
+  Future<Map<String, dynamic>> fetchOrganizationInfo(String id) async {
     try {
-      final res = await _service.get(
-        '$channelsBaseUrl/organizations/$id',
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final res = await _api.get('/organizations/$id', headers: headers);
       log.i(res);
-      return OrganizationModel.fromJson(res?['data']);
+      return res?.data?['data'];
     } on Failure catch (e) {
       log.w(e.toString());
       rethrow;
@@ -83,12 +74,13 @@ class OrganizationRepo extends IOrganizationRepo {
   /// takes in a `url` and returns a Organization that matches the url
   /// use this url for testing `Zurichat-fsp1856.Zurichat.com`
   @override
-  Future fetchOrganizationByUrl(String url, token) async {
+  Future<Map<String, dynamic>> fetchOrganizationByUrl(String url) async {
     try {
-      final res = await _service.get('/organizations/url/$url',
-          headers: {'Authorization': 'Bearer $token'});
+      final res = await _api.get('/organizations/url/$url', headers: headers);
       log.i(res);
-      return OrganizationModel.fromJson(res['data']);
+
+      res?.data?['data']['id'] = res.data['data']['_id'];
+      return res?.data?['data'];
     } on Failure catch (e) {
       log.w(e.toString());
       rethrow;
@@ -103,13 +95,11 @@ class OrganizationRepo extends IOrganizationRepo {
   ///This should be used to add users to an organization by the admin user alone
   /// takes in a `Organization id` and joins the Organization
   @override
-  Future<bool> joinOrganization(String orgId, String email, token) async {
-    final res = await _service.post(
-      '$channelsBaseUrl/organizations/$orgId/members',
-      body: {'user_email': email},
-      headers: {'Authorization': 'Bearer $token'},
-    );
-    if (res.statusCode == 200) {
+  Future<bool> joinOrganization(String orgId, String email) async {
+    final res = await _api.post('/organizations/$orgId/members',
+        body: {'user_email': email}, headers: headers);
+
+    if (res?.statusCode == 200) {
       return true;
     }
     return false;
@@ -117,12 +107,14 @@ class OrganizationRepo extends IOrganizationRepo {
 
   /// This method creates an organization. Creator email `email` must be present
   @override
-  Future<String> createOrganization(String email, token) async {
+  Future<String> createOrganization(String email) async {
     try {
-      final res = await _service.post('$channelsBaseUrl/organizations',
-          headers: {'Authorization': 'Bearer $token'},
-          body: {'creator_email': email});
-      return res['data']['InsertedID'];
+      final res = await _api.post(
+        '/organizations',
+        headers: headers,
+        body: {'creator_email': email},
+      );
+      return res?.data?['data']['organization_id'];
     } on Failure catch (e) {
       log.w(e.toString());
       rethrow;
@@ -136,14 +128,18 @@ class OrganizationRepo extends IOrganizationRepo {
   /// null or empty. Url must not begin with `https` or `http`
 
   @override
-  Future updateOrgUrl(String orgId, String url, token) async {
+  Future<bool> updateOrgUrl(String orgId, String url) async {
     try {
-      final res = await _service.patch(
-        '${coreBaseUrl}organizations/$orgId/url',
-        headers: {'Authorization': 'Bearer $token'},
+      final res = await _api.patch(
+        '/organizations/$orgId/url',
+        headers: headers,
         body: {'url': url},
       );
-      return res['message'];
+
+      if (res?.statusCode == 200) {
+        return true;
+      }
+      return false;
     } on Failure catch (e) {
       log.w(e.toString());
       rethrow;
@@ -156,14 +152,18 @@ class OrganizationRepo extends IOrganizationRepo {
   /// Updates an organization's name. The organization's id `orgId` must not be
   /// null or empty
   @override
-  Future updateOrgName(String orgId, String name, token) async {
+  Future<bool> updateOrgName(String orgId, String name) async {
     try {
-      final res = await _service.patch(
-        '${coreBaseUrl}organizations/$orgId/name',
-        headers: {'Authorization': 'Bearer $token'},
+      final res = await _api.patch(
+        '/organizations/$orgId/name',
+        headers: headers,
         body: {'organization_name': name},
       );
-      return res['message'];
+
+      if (res?.statusCode == 200) {
+        return true;
+      }
+      return false;
     } on Failure catch (e) {
       log.w(e.toString());
       rethrow;
@@ -176,7 +176,7 @@ class OrganizationRepo extends IOrganizationRepo {
   /// Updates an organization's logo. The organization's id `orgId` must not be
   /// null or empty
   @override
-  Future<bool> updateOrgLogo(String orgId, File image, token) async {
+  Future<bool> updateOrgLogo(String orgId, File image) async {
     try {
       var formData = FormData.fromMap({
         'height': 300,
@@ -187,12 +187,15 @@ class OrganizationRepo extends IOrganizationRepo {
           contentType: MediaType('image', 'jpeg'),
         ),
       });
-      await _service.patch(
-        '${coreBaseUrl}organizations/$orgId/logo',
+      final res = await _api.patch(
+        'organizations/$orgId/logo',
         headers: {'Authorization': 'Bearer $token'},
         body: formData,
       );
-      return true;
+      if (res?.statusCode == 200) {
+        return true;
+      }
+      return false;
     } on Failure catch (e) {
       log.w(e.toString());
       rethrow;
@@ -205,14 +208,17 @@ class OrganizationRepo extends IOrganizationRepo {
   /// Add members to an organization either through invite
   /// or by calls
   @override
-  Future addMemberToOrganization(String orgId, String email, token) async {
+  Future<bool> addMemberToOrganization(String orgId, String email) async {
     try {
-      final res = await _service.post(
-        '$channelsBaseUrl/organizations/$orgId/members',
-        headers: {'Authorization': 'Bearer $token'},
+      final res = await _api.post(
+        '/organizations/$orgId/members',
+        headers: headers,
         body: {'user_email': email},
       );
-      return res['message'];
+      if (res?.statusCode == 200) {
+        return true;
+      }
+      return false;
     } on Failure catch (e) {
       log.w(e.toString());
       rethrow;
@@ -225,14 +231,13 @@ class OrganizationRepo extends IOrganizationRepo {
   /// FETCHING MEMBERS
 
   @override
-  Future<List<UserSearch>> fetchMembersInOrganization(
-      String orgId, token) async {
+  Future<List> fetchMembersInOrganization(String orgId) async {
     try {
-      final res = await _service.get(
-        '$channelsBaseUrl/organizations/$orgId/members',
-        headers: {'Authorization': 'Bearer $token'},
+      final res = await _api.get(
+        '/organizations/$orgId/members',
+        headers: headers,
       );
-      return (res['data'] as List).map((e) => UserSearch.fromJson(e)).toList();
+      return res?.data?['data'];
     } on Failure catch (e) {
       log.w(e.toString());
       rethrow;
@@ -247,10 +252,10 @@ class OrganizationRepo extends IOrganizationRepo {
       String orgId, List body, String token) async {
     try {
       final data = {"emails": body};
-      final res = await _service.post(
+      final res = await _api.post(
         'organizations/$orgId/send-invite',
         body: data,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: headers,
       );
       log.i(res);
     } on Failure catch (e) {
