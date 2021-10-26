@@ -1,9 +1,9 @@
 import 'dart:io';
 
+import 'package:zurichat/api_request/organization_api/i_organization_api.dart';
+import 'package:zurichat/api_request/organization_api/organization_api.dart';
 import 'package:zurichat/models/organization_member_model.dart';
 import 'package:zurichat/models/user_search_model.dart';
-import 'package:zurichat/repository/organization_repo/i_organization_repo.dart';
-import 'package:zurichat/repository/organization_repo/organization_repo.dart';
 import 'package:zurichat/utilities/api_handlers/zuri_api.dart';
 import '../../app/app.locator.dart';
 import '../../app/app.logger.dart';
@@ -18,6 +18,7 @@ class OrganizationApiService {
   final _api = ZuriApi(coreBaseUrl);
 
   final IOrganizationRepo orgRepo = OrganizationRepo();
+
   final storageService = locator<SharedPreferenceLocalStorage>();
   final _userService = locator<UserService>();
 
@@ -30,8 +31,7 @@ class OrganizationApiService {
     // return (res?.data?['data'] as List)
     //     .map((e) => OrganizationModel.fromJson(e))
     //     .toList();
-    List orgList = await orgRepo.fetchListOfOrganizations();
-    return orgList.map((e) => OrganizationModel.fromJson(e)).toList();
+    return await orgRepo.fetchListOfOrganizations();
   }
 
   ///Get the list of Organization the user has joined
@@ -47,8 +47,7 @@ class OrganizationApiService {
     //     .map((e) => OrganizationModel.fromJson(e))
     //     .toList();
 
-    List joinedOrgList = await orgRepo.getJoinedOrganizations(email);
-    return joinedOrgList.map((e) => OrganizationModel.fromJson(e)).toList();
+    return await orgRepo.getJoinedOrganizations(email);
   }
 
   /// Fetches information on a particular Organization. It takes a parameter
@@ -58,8 +57,7 @@ class OrganizationApiService {
     // log.i('>>>>>>>>>>>>> Selected Orge $res');
     // return OrganizationModel.fromJson(res?.data?['data']);
 
-    Map<String, dynamic> info = await orgRepo.fetchOrganizationInfo(id);
-    return OrganizationModel.fromJson(info);
+    return await orgRepo.fetchOrganizationInfo(id);
   }
 
   /// takes in a `url` and returns a Organization that matches the url
@@ -70,8 +68,7 @@ class OrganizationApiService {
 
     // res?.data?['data']['id'] = res.data['data']['_id'];
     // return OrganizationModel.fromJson(res?.data?['data']);
-    Map<String, dynamic> info = await orgRepo.fetchOrganizationByUrl(url);
-    return OrganizationModel.fromJson(info);
+    return await orgRepo.fetchOrganizationByUrl(url);
   }
 
   ///Limited to the admin who created the org
@@ -163,8 +160,7 @@ class OrganizationApiService {
     //     .map((e) => UserSearch.fromJson(e))
     //     .toList();
 
-    List membersInOrg = await orgRepo.fetchMembersInOrganization(orgId);
-    return (membersInOrg).map((e) => UserSearch.fromJson(e)).toList();
+    return await orgRepo.fetchMembersInOrganization(orgId);
   }
 
   @Deprecated("use fetch members in an organisation instead")

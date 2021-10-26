@@ -5,7 +5,6 @@ import 'package:stacked_services/stacked_services.dart';
 import 'package:zurichat/app/app.locator.dart';
 import 'package:zurichat/app/app.router.dart';
 import 'package:zurichat/models/organization_model.dart';
-import 'package:zurichat/repository/repository.dart';
 import 'package:zurichat/services/app_services/media_service.dart';
 import 'package:zurichat/services/in_review/organization_api_service.dart';
 import 'package:zurichat/services/in_review/user_service.dart';
