@@ -120,18 +120,36 @@ class ApiService {
   /// This method handles all possible errors from from a network call.
   Failure convertException(DioError e) {
     switch (e.type) {
-      case DioErrorType.connectTimeout:
-        throw NetworkFailure();
-      case DioErrorType.sendTimeout:
-        throw NetworkFailure();
-      case DioErrorType.receiveTimeout:
-        throw NetworkFailure();
-      case DioErrorType.response:
-        throw ServerFailure(error: e.message);
       case DioErrorType.cancel:
-        throw InputFailure(errorMessage: e.message);
-      case DioErrorType.other:
-        throw UnknownFailure();
+        throw InputFailure(
+          response: e.response,
+          error: e.message,
+        );
+      case DioErrorType.connectTimeout:
+        throw NetworkFailure(
+          response: e.response,
+          error: e.message,
+        );
+      case DioErrorType.receiveTimeout:
+        throw NetworkFailure(
+          response: e.response,
+          error: e.message,
+        );
+      case DioErrorType.sendTimeout:
+        throw NetworkFailure(
+          response: e.response,
+          error: e.message,
+        );
+      case DioErrorType.response:
+        throw ServerFailure(
+          response: e.response,
+          error: e.message,
+        );
+      default:
+        throw UnknownFailure(
+          response: e.response,
+          error: e.message,
+        );
     }
   }
 }
